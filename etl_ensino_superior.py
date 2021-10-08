@@ -63,6 +63,7 @@ def create_dm_tempo(op_con, dm_con):
     id_tempo = []
 
     for tempo in semestres:
+        # Ignora o cabeçalho da tabela
         if tempo[0] != "SEMESTRE":
             id_tempo.append(int(tempo[0]))
 
@@ -82,7 +83,7 @@ def create_ft_reprovacoes(op_con, dm_con):
     reprovacoes = petl.fromdb(
         op_con,
         """select
-            a.cotista,
+            a.cotista, 
             c.cod_curso,
             d.cod_dpto,
             m.semestre,
@@ -111,39 +112,46 @@ def create_ft_reprovacoes(op_con, dm_con):
     qtd_alunos_reprovados = []
     qtd_alunos_cotistas_reprovados = []
 
+    """
+    Dicionário de índices
+
+    0 : Flag Cotista
+    1 : Código do Curso
+    2 : Código do Departamento
+    3 : Semestre
+    4 : Nota
+    5 : Faltas
+    6 : Código da Disciplina
+    7 : Carga horária da disciplina
+    """
+
     for curso_disciplina in matriz_cursos:
-        aux_qtd_alunos = 0
-        aux_qtd_alunos_cotistas = 0
-        aux_qtd_alunos_reprovados = 0
-        aux_qtd_alunos_cotistas_reprovados = 0
-        aux_depto = 0
-        aux_tempo = 0
         for semestre in semestres:
-            for reprovacao in reprovacoes:
+            aux_qtd_alunos_cotistas = 0
+            aux_qtd_alunos_reprovados = 0
+            aux_qtd_alunos_cotistas_reprovados = 0
+            aux_depto = 0
+            aux_qtd_alunos = 0
+            for aluno in reprovacoes:
                 if (
-                    int(curso_disciplina[0]) == int(reprovacao[1])
-                    and int(curso_disciplina[1]) == int(reprovacao[6])
-                ) and int(semestre[0]) == int(reprovacao[3]):
+                    int(curso_disciplina[0]) == int(aluno[1])
+                    and int(curso_disciplina[1]) == int(aluno[6])
+                ) and int(semestre[0]) == int(aluno[3]):
                     aux_qtd_alunos += 1
-                    if reprovacao[4] <= 7 or float(
-                        (reprovacao[5] / (reprovacao[7])) <= 0.25
-                    ):
+                    if (float(aluno[4]) < 7.0) or (aluno[5] >= (0.25 * aluno[7])):
                         aux_qtd_alunos_reprovados += 1
 
-                    if reprovacao[0] == "S":
+                    if aluno[0] == "S":
                         aux_qtd_alunos_cotistas += 1
-                        if reprovacao[4] <= 7 or float(
-                            (reprovacao[5] / (reprovacao[7])) <= 0.25
-                        ):
+                        if (float(aluno[4]) < 7.0) or (aluno[5] >= (0.25 * aluno[7])):
                             aux_qtd_alunos_cotistas_reprovados += 1
 
-                        aux_depto = reprovacao[2]
-                        aux_tempo = reprovacao[3]
+                    aux_depto = aluno[2]
             if aux_qtd_alunos > 0:
                 id_curso.append(curso_disciplina[0])
                 id_disciplina.append(curso_disciplina[1])
                 id_departamento.append(aux_depto)
-                id_tempo.append(aux_tempo)
+                id_tempo.append(semestre[0])
                 qtd_alunos.append(aux_qtd_alunos)
                 qtd_alunos_cotistas.append(aux_qtd_alunos_cotistas)
                 qtd_alunos_reprovados.append(aux_qtd_alunos_reprovados)
@@ -176,7 +184,6 @@ def create_ft_reprovacoes(op_con, dm_con):
     ft_reprovacoes = petl.transform.basics.addcolumn(
         ft_reprovacoes, "QTD_ALUNOS_COTISTAS_REPROVADOS", qtd_alunos_cotistas_reprovados
     )
-
     petl.todb(ft_reprovacoes, get_cursor_dm(dm_con), "FT_REPROVACOES")
 
 
